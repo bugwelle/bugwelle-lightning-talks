@@ -1,0 +1,263 @@
+
+\documentclass[xcolor=dvipsnames,hyperref={pdfpagelabels=false}]{beamer}
+
+\usepackage{courier}                 % "courier" als Schriftart einbinden
+\usepackage{icomma}                  % Deutsche Kommas bei Zahlen
+\usepackage{xcolor}
+
+\usepackage[utf8]{inputenc}          % UTF-8 codierte Dateien
+\usepackage[english, ngerman]{babel} % Setze die Sprache(n) für Rechtschreibung, etc.
+                                     % Die letzte Sprache ist die Beginnende.
+\usepackage{lmodern}                 % Bessere Schriftart
+
+
+%\usetheme{Berlin}
+
+%Damit wir Quellcode nutzen können.
+\usepackage{listings}
+\lstset{numbers=left,
+	numberstyle=\tiny,
+	numbersep=5pt,
+	breaklines=true,
+	showstringspaces=false,
+	frame=l,
+	tabsize=4,
+	xleftmargin=15pt,
+	xrightmargin=15pt,
+	basicstyle=\ttfamily\scriptsize,
+	stepnumber=1,
+	keywordstyle=\color{blue},          % keyword style
+	commentstyle=\color{dkgreen},       % comment style
+	stringstyle=\color{BurntOrange}     % string literal style
+}
+%Sprache Festelegen
+\lstset{language=C}
+
+\useoutertheme[subsection=true]{smoothbars}
+
+\title{ThreadSanitizer}   
+\author{Andre Meyering} 
+\date{\today}
+
+\begin{document}
+
+
+\begin{frame}
+\titlepage
+\end{frame} 
+
+\begin{frame}
+\frametitle{Inhaltsverzeichnis}
+\tableofcontents
+\end{frame} 
+
+
+\section{Einführung} 
+\begin{frame}
+	\frametitle{Aktuelle Situation} 
+    \begin{itemize}
+    	\item parallele Ausführung wird immer wichtiger
+    	\item Code wird immer paralleler\pause 
+    	\item immer mehr Abstraktionen
+    	\item Code wird komplexer
+    	\item Race-Conditions schwer zu entdecken
+    \end{itemize}
+\end{frame}
+
+\begin{frame} 
+	\frametitle{Wie Race-Conditions finden?} 
+	\begin{itemize}
+		\item viel Nachdenken\pause 
+		\item viel Kopfzerbrechen\pause 
+		\item viele Tränen
+	\end{itemize}
+\end{frame}
+
+\begin{frame} 
+	\frametitle{Lösung - Thead Sanitizer}
+	\begin{quotation}
+		ThreadSanitizer is a tool that detects data races. It consists of a compiler instrumentation module and a run-time library.
+	\end{quotation}
+
+	\begin{itemize}
+		\item von Google als Teil von LLVM entwickelt
+		\item \footnotesize{\url{https://clang.llvm.org/docs/ThreadSanitizer.html}}
+	\end{itemize}
+\end{frame}
+
+
+\section{Funktionsweise} 
+\begin{frame}
+	\frametitle{Anforderungen}
+	\begin{itemize}
+		\item Linux, NetBSD, FreeBSD | 64\,Bit\pause 
+		\item ab GCC 4.8 (2012)\footnote{\tiny{\url{https://www.phoronix.com/scan.php?page=news_item&px=MTIzOTU}}}
+		\item ab Clang \~{}3.5\pause 
+		\item Erfordert die ThreadSanitizer Library
+		\item \texttt{sudo apt install libtsan0}
+		\item benötigt Position Independent Code (\texttt{-fPIE})
+	\end{itemize} 
+\end{frame}
+
+\begin{frame}
+\frametitle{Funktionsweise}
+	\begin{itemize}
+		\item fügt eigene Instruktionen in das Binary ein\medskip\pause 
+		\item \texttt{export CFLAGS="{}-g -O2 -fsanitize=thread -fno-omit-frame-pointer"}
+			\begin{itemize}
+				\item Debug Informationen
+				\item Optimierung für bessere Performance
+				\item Frame Pointer für besseren Stacktrace
+			\end{itemize}\medskip\pause 
+		\item Error zur Runtime falls Race-Condition entdeckt wurde
+	\end{itemize}
+\end{frame}
+
+\section{Beispiele} 
+\begin{frame}[fragile]
+	\frametitle{pthread | Ausgabe}
+	\lstinputlisting{frame-examples/pthread_error.c}
+	\smallskip
+	\texttt{gcc  -g  -O2  -fsanitize=thread}\\
+		\texttt{~~~-fno-omit-frame-pointer}\\
+		\texttt{~~~-o pthread\_error  pthread\_error.c}
+	\vspace*{1cm}
+\end{frame}
+
+\begin{frame}[fragile]
+	\frametitle{pthread}
+	\lstinputlisting[language={},basicstyle=\tiny]{frame-examples/pthread_error.err}
+	
+\end{frame}
+
+
+\begin{frame}[fragile]
+	\frametitle{OpenMP}
+	\lstinputlisting{./frame-examples/openmp_no_error.c}
+	\bigskip
+	Wo ist die Race-Condition?\\\pause
+	\begin{itemize}
+		 \item es gibt keine\\\pause
+		 \item dennoch Fehlermeldung
+	\end{itemize}
+\end{frame}
+
+\section{OpenMP}
+\begin{frame}
+	\frametitle{OpenMP - ThreadSanitizer}
+	\begin{itemize}
+		\item OpenMP hat TSAN Unterstützung
+		\item \url{https://xrunhprof.wordpress.com/2018/08/27/tsan-with-openmp/}
+		\item CMake Flag: \texttt{-DLIBOMP\_TSAN\_SUPPORT=ON}
+	\end{itemize}
+
+	\begin{block}{Beispiel}
+		\medskip	
+		\texttt{clang -fno-omit-frame-pointer -g}\\
+		\texttt{~~~-isystem/path/to/omp/include -L/path/to/omp/lib}\\
+		\texttt{~~~-fopenmp -fsanitize=thread file.c -o out}
+	\end{block}
+\end{frame}
+
+\begin{frame}
+\frametitle{Beispiel}
+	\lstinputlisting{./frame-examples/openmp_error.c}
+	\medskip
+	Wer findet die Race-Condition?
+	\vspace*{1cm}
+\end{frame}
+
+\begin{frame}
+	\frametitle{Fehlermeldung}
+	\lstinputlisting[language={},basicstyle=\tiny]{./frame-examples/openmp_error.err}
+	\vspace*{1cm}
+\end{frame}
+
+\begin{frame}
+\frametitle{Achtung}
+	\begin{block}{Normales OpenMP}
+		\begin{itemize}
+			\item ThreadSanitizer meckert bei jedem Durchlauf
+			\item false-positives
+		\end{itemize}
+	\end{block}
+
+	\begin{block}{ThreadSanitizer OpenMP}
+		\begin{itemize}
+			\item ThreadSanitizer meckert beim pthread Beispiel gar nicht
+			\item keine false-positives
+			\item meckert beim OpenMP Beispiel
+			\item viele false-negatives (läuft nicht immer in race-condition)
+		\end{itemize}
+	\end{block}
+\end{frame}
+
+
+\section{Fazit / Ausblick}
+\begin{frame}
+	\frametitle{Fazit}
+	\begin{block}{ThreadSanitizer}
+		\begin{itemize}
+			\item sehr nützlich um Race-Conditions zu finden
+			\item verlangsamt Code um das 10 bis 15 fache
+			\item ein Muss für neue Projekte
+		\end{itemize}
+	\end{block}
+
+	\begin{block}{OpenMP + ThreadSanitizer}
+		\begin{itemize}
+			\item nützlich bei OpenMP Projekten
+			\item keine false-positives bei \texttt{\#pragma omp parallel}
+			\item meldet nicht immer Race-Conditions \newline(es muss eine stattfinden)
+		\end{itemize}
+	\end{block}
+
+%\begin{exampleblock}{Blocktitel}
+%Blocktext 
+%\end{exampleblock}
+
+%\begin{alertblock}{Blocktitel}
+%Blocktext 
+%\end{alertblock}
+
+\end{frame}
+
+
+\begin{frame}
+	\frametitle{Ausblick}
+	\begin{block}{Weitere Sanitizer}
+		\medskip	
+		\begin{itemize}
+			\item AddressSanitizer
+				\begin{itemize}
+					\item use-after-free error
+					\item LeakSanitizer
+				\end{itemize}
+				\medskip
+			\item MemorySanitizer
+				\begin{itemize}
+					\item unitialized memory read
+				\end{itemize}
+				\medskip
+			\item UndefinedBehaviorSanitizer
+				\begin{itemize}
+					\item signed integer overflow
+					\item integer divide by zero
+				\end{itemize}
+			\end{itemize}
+		\end{block}	
+\end{frame}
+
+\begin{frame}
+	\frametitle{Danke}
+	\begin{itemize}
+		\item Präsentation und Projekt unter:\newline \footnotesize{\url{https://github.com/bugwelle/bugwelle-lightning-talks}}
+	\end{itemize}
+	\bigskip
+	\bigskip
+	\begin{center}
+		\huge Fragen?
+	\end{center}
+\end{frame}
+
+\end{document}
