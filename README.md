@@ -1,4 +1,7 @@
-# [German] Präsentation zum Compiler Explorer
+# My lightning talks
 
-Präsentation für meinen Lightning Talk.
-Folien mit Google Docs erstellt, dann exportiert.
+This repository contains some of my lightning talk presentation.
+
+## German
+
+ - Compiler Explorer
